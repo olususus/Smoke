@@ -76,5 +76,5 @@ jobs:
 
             Install `git` on your system before running Smoke.
           releaseDraft: false
-          prerelease: true
+          prerelease: false
           args: --target x86_64-unknown-linux-gnu
