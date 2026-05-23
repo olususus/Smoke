@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# Bump Smoke version everywhere (package.json, package-lock, tauri.conf, Cargo.toml).
+#
+# Usage:
+#   ./version-change              # print current version
+#   ./version-change 0.2.0        # set exact version
+#   ./version-change v0.2.0       # same (leading v is stripped)
+#   ./version-change patch        # 0.1.0 → 0.1.1
+#   ./version-change minor        # 0.1.0 → 0.2.0
+#   ./version-change major        # 0.1.0 → 1.0.0
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT"
+
+PKG_JSON="$ROOT/package.json"
+TAURI_CONF="$ROOT/src-tauri/tauri.conf.json"
+CARGO_TOML="$ROOT/src-tauri/Cargo.toml"
+
+current_version() {
+  node -p "require('./package.json').version"
+}
+
+usage() {
+  cat <<'EOF'
+Usage: ./version-change [<version>|patch|minor|major]
+
+Updates version in:
+  - package.json (+ package-lock.json via npm)
+  - src-tauri/tauri.conf.json
+  - src-tauri/Cargo.toml
+
+Does not commit or create a git tag.
+
+After bumping:
+  git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
+  git commit -m "Bump version to X.Y.Z"
+  git tag vX.Y.Z
+  git push origin main && git push origin vX.Y.Z
+EOF
+}
+
+normalize_version() {
+  local raw="$1"
+  raw="${raw#v}"
+  if [[ ! "$raw" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+    echo "Invalid semver: $1 (expected e.g. 0.2.0 or v0.2.0)" >&2
+    exit 1
+  fi
+  echo "$raw"
+}
+
+set_tauri_version() {
+  local ver="$1"
+  sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"${ver}\"/" "$TAURI_CONF"
+}
+
+set_cargo_version() {
+  local ver="$1"
+  sed -i "s/^version = \"[^\"]*\"/version = \"${ver}\"/" "$CARGO_TOML"
+}
+
+sync_native_versions() {
+  local ver="$1"
+  set_tauri_version "$ver"
+  set_cargo_version "$ver"
+}
+
+verify_all_match() {
+  local ver="$1"
+  local tauri cargo
+  tauri=$(grep -m1 '"version"' "$TAURI_CONF" | sed -n 's/.*"version": "\([^"]*\)".*/\1/p')
+  cargo=$(grep -m1 '^version = ' "$CARGO_TOML" | sed -n 's/version = "\([^"]*\)"/\1/p')
+  if [[ "$ver" != "$tauri" || "$ver" != "$cargo" ]]; then
+    echo "Version mismatch after update (expected ${ver}):" >&2
+    echo "  package.json: $(current_version)" >&2
+    echo "  tauri.conf:   ${tauri}" >&2
+    echo "  Cargo.toml:   ${cargo}" >&2
+    exit 1
+  fi
+}
+
+if [[ $# -eq 0 ]]; then
+  echo "Current version: $(current_version)"
+  echo ""
+  echo "Tag on GitHub Releases should match: v$(current_version)"
+  exit 0
+fi
+
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+  usage
+  exit 0
+fi
+
+ARG="$1"
+
+if [[ "$ARG" == "patch" || "$ARG" == "minor" || "$ARG" == "major" ]]; then
+  if ! command -v npm >/dev/null; then
+    echo "npm is required for patch/minor/major bumps." >&2
+    exit 1
+  fi
+  echo "Bumping ${ARG} from $(current_version)…"
+  npm version "$ARG" --no-git-tag-version
+  NEW="$(current_version)"
+else
+  NEW="$(normalize_version "$ARG")"
+  OLD="$(current_version)"
+  if [[ "$NEW" == "$OLD" ]]; then
+    echo "Already at ${NEW}; syncing tauri + Cargo anyway."
+  else
+    echo "Changing ${OLD} → ${NEW}…"
+  fi
+  if ! command -v npm >/dev/null; then
+    echo "npm is required." >&2
+    exit 1
+  fi
+  npm version "$NEW" --no-git-tag-version --allow-same-version
+fi
+
+sync_native_versions "$NEW"
+verify_all_match "$NEW"
+
+echo ""
+echo "✓ All files at version ${NEW}"
+echo ""
+echo "Next steps:"
+echo "  git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml"
+echo "  git commit -m \"Bump version to ${NEW}\""
+echo "  git tag v${NEW}"
+echo "  git push origin HEAD && git push origin v${NEW}"

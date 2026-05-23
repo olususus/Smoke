@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Git tag to build (e.g. v0.1.0). Use after pushing the tag.
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libfuse2 \
+            rpm \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libssl-dev
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Build and publish release
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: src-tauri
+          tagName: ${{ github.event.inputs.tag || github.ref_name }}
+          releaseName: Smoke ${{ github.event.inputs.tag || github.ref_name }}
+          releaseBody: |
+            Linux builds for this tag.
+
+            - `.deb` (Debian/Ubuntu)
+            - `.rpm` (Fedora/RHEL)
+            - `.AppImage` (portable)
+
+            Install `git` on your system. Smoke is not affiliated with GitHub.
+
+            **Beta:** report issues at https://github.com/olususus/smoke/issues
+          releaseDraft: false
+          prerelease: ${{ startsWith(github.ref_name, 'v0.0.') || startsWith(github.event.inputs.tag, 'v0.0.') }}
+          args: --target x86_64-unknown-linux-gnu

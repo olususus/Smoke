@@ -1,0 +1,16 @@
+pub mod branch_tracking;
+pub mod history;
+pub mod diff;
+pub mod staging;
+pub mod branches;
+pub mod remote;
+pub mod credentials;
+pub mod cli_sync;
+pub mod sync;
+pub mod conflicts;
+pub mod stash;
+pub mod history_actions;
+pub mod rebase;
+pub mod tags;
+pub mod config;
+pub mod bootstrap;
