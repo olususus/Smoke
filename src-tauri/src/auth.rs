@@ -590,5 +590,7 @@ async fn validate_token(token: &str) -> Result<bool, String> {
         .await
         .map_err(|e| format!("Token validation failed: {e}"))?;
 
-    Ok(resp.status().is_success())
+    // Only 401 means the token is definitively invalid.
+    // 429 (rate-limited), 5xx, or any other transient error must NOT delete the token.
+    Ok(resp.status() != reqwest::StatusCode::UNAUTHORIZED)
 }

@@ -214,6 +214,9 @@ export function GitProvider({ children }: { children: React.ReactNode }) {
   const backgroundPauseRef = useRef(0);
   const fingerprintRef = useRef<string>("");
   const headRef = useRef<string | null>(null);
+  const repoInfoRef = useRef<RepoInfo | null>(null);
+
+  repoInfoRef.current = repoInfo;
 
   const pauseBackgroundRefresh = useCallback(() => {
     backgroundPauseRef.current += 1;
@@ -318,17 +321,18 @@ export function GitProvider({ children }: { children: React.ReactNode }) {
         invoke<BranchInfo[]>("get_branches", { repoPath }),
       ]);
 
+      const prev = repoInfoRef.current;
       const fp = workingTreeFingerprint(st);
       const treeChanged = fp !== fingerprintRef.current;
       const syncMetaChanged =
-        info.ahead !== repoInfo?.ahead ||
-        info.behind !== repoInfo?.behind ||
-        info.upstream_set !== repoInfo?.upstream_set ||
-        info.current_branch !== repoInfo?.current_branch ||
-        info.is_dirty !== repoInfo?.is_dirty;
+        info.ahead !== prev?.ahead ||
+        info.behind !== prev?.behind ||
+        info.upstream_set !== prev?.upstream_set ||
+        info.current_branch !== prev?.current_branch ||
+        info.is_dirty !== prev?.is_dirty;
       const needHistory =
-        info.current_branch !== repoInfo?.current_branch ||
-        info.total_commits !== repoInfo?.total_commits;
+        info.current_branch !== prev?.current_branch ||
+        info.total_commits !== prev?.total_commits;
 
       setRepoInfo(info);
       setStatus(st);
@@ -363,7 +367,7 @@ export function GitProvider({ children }: { children: React.ReactNode }) {
     } catch {
       return false;
     }
-  }, [repoPath, commits, repoInfo]);
+  }, [repoPath]);
 
   const openRepo = useCallback(async (path: string) => {
     await loadRepo(path);

@@ -327,11 +327,7 @@ pub fn push_remote(repo_path: String, force: Option<bool>) -> Result<SyncResult,
     let had_upstream = branch_tracking::branch_upstream_configured(&repo, branch);
     let publishing = !had_upstream;
 
-    let _ = cli_sync::cli_fetch(&repo_path);
-
     do_push(&repo_path, branch, publishing, use_force)?;
-
-    let _ = cli_sync::cli_fetch(&repo_path);
 
     let message = if publishing {
         format!("Published branch {branch} to origin.")
