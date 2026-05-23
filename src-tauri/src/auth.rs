@@ -215,7 +215,7 @@ pub async fn auth_request_device_code(session: State<'_, AuthSession>) -> Result
         .header("User-Agent", "Smoke/0.1.0")
         .form(&[
             ("client_id", CLIENT_ID),
-            ("scope", "repo read:org read:user"),
+            ("scope", "repo read:org read:user workflow"),
         ])
         .send()
         .await
