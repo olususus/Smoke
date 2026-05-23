@@ -60,7 +60,7 @@ jobs:
           echo "name=Smoke ${TAG}" >> $GITHUB_OUTPUT
 
       - name: Build and publish release
-        uses: tauri-apps/tauri-action@v1
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:

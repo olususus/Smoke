@@ -354,21 +354,24 @@ export default function RepoPage() {
   const handlePush = async (force = false) => {
     if (pushing || !remoteUrl) return;
 
-    if (!force) {
-      const prePushSecrets =
-        collectSecretsFromDiffs(
-          git.workingDiff,
-          git.stagedDiff,
-          undefined,
-          settings.customSecretPatterns
-        ).length;
-      if (prePushSecrets > 0 && settings.commitSafety !== "off") {
-        const proceed = await confirmApp(
-          `${prePushSecrets} potential secret(s) in local changes. Push anyway?`
-        );
-        if (!proceed) return;
-      }
-      try {
+    setPushing(true);
+    clearSyncFeedback();
+
+    try {
+      if (!force) {
+        const prePushSecrets =
+          collectSecretsFromDiffs(
+            git.workingDiff,
+            git.stagedDiff,
+            undefined,
+            settings.customSecretPatterns
+          ).length;
+        if (prePushSecrets > 0 && settings.commitSafety !== "off") {
+          const proceed = await confirmApp(
+            `${prePushSecrets} potential secret(s) in local changes. Push anyway?`
+          );
+          if (!proceed) return;
+        }
         try {
           await git.fetchRemote();
           await git.refreshAll();
@@ -380,15 +383,8 @@ export default function RepoPage() {
           setForcePushOpen(true);
           return;
         }
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (msg) void notifySyncError(msg, "Push");
       }
-    }
 
-    setPushing(true);
-    clearSyncFeedback();
-    try {
       const result = await git.pushRemote(force);
       await git.refreshAll();
       setLastFetchLabel("Last fetched just now");
